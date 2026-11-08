@@ -1,0 +1,8 @@
+{
+  "name": "web-data",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clears the WebView's cookies and website data (Scrimba Companion local module)",
+  "main": "index.ts",
+  "license": "MIT"
+}

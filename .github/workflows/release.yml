@@ -1,0 +1,113 @@
+name: Release builds
+
+# Manually triggered. Never publishes to Google Play or the App Store.
+on:
+  workflow_dispatch:
+    inputs:
+      eas_android:
+        description: Also start an EAS Android "preview" APK build (needs EXPO_TOKEN secret)
+        type: boolean
+        default: false
+      eas_ios:
+        description: Also start an EAS iOS build (needs EXPO_TOKEN + Apple credentials in EAS)
+        type: boolean
+        default: false
+      draft_release:
+        description: Create a draft GitHub Release with the APK attached
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    name: Android APK (Gradle)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only for the draft GitHub Release
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npm run verify
+      - run: npx expo prebuild --platform android --no-install
+      - name: Restore release keystore (optional)
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+      - name: Assemble release APK
+        working-directory: android
+        env:
+          NODE_ENV: production
+          # Gradle reads ORG_GRADLE_PROJECT_* as project properties, so the passwords never
+          # appear on a command line (process list, logs).
+          ORG_GRADLE_PROJECT_SC_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_SC_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_SC_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$HAS_KEYSTORE" = "true" ]; then
+            export ORG_GRADLE_PROJECT_SC_RELEASE_STORE_FILE="$RUNNER_TEMP/release.keystore"
+          else
+            echo "::warning::No release keystore secrets; APK is signed with a debug key (installable, but not upgradable by APKs signed differently)."
+          fi
+          ./gradlew assembleRelease --no-daemon
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+      - name: Name artifact
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          cp android/app/build/outputs/apk/release/app-release.apk "scrimba-companion-${VERSION}.apk"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scrimba-companion-apk
+          path: scrimba-companion-*.apk
+      # A debug-signed APK uses the Expo template's public debug key: anyone could sign a
+      # different APK with it and install it over the app (and its signed-in session).
+      # Never publish one.
+      - name: Refuse to publish a debug-signed APK
+        if: ${{ inputs.draft_release && env.HAS_KEYSTORE != 'true' }}
+        run: |
+          echo "::error::Draft release skipped: set ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets to publish APKs."
+          exit 1
+      - name: Draft GitHub Release
+        if: ${{ inputs.draft_release && env.HAS_KEYSTORE == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${VERSION}-${GITHUB_RUN_NUMBER}" scrimba-companion-*.apk \
+            --draft --title "Scrimba Companion ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
+            --notes "Unofficial, not affiliated with Scrimba. See README for install steps and known limitations."
+
+  eas:
+    name: EAS cloud builds (optional)
+    runs-on: ubuntu-latest
+    if: ${{ inputs.eas_android || inputs.eas_ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - if: ${{ inputs.eas_android }}
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+      - if: ${{ inputs.eas_ios }}
+        run: eas build --platform ios --profile preview --non-interactive --no-wait

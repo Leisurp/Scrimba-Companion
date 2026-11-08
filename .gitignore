@@ -39,3 +39,25 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local toolchain (JDK, Android SDK, AVDs, Playwright browsers) — never commit
+.toolchain/
+
+# Test output
+e2e/test-results/
+e2e/test-results-live/
+e2e/report/
+device-test-output/
+coverage/
+
+# Build output
+dist/
+*.apk
+*.aab
+*.keystore
+!android/app/debug.keystore
+credentials.json
+
+# local module build output
+modules/*/android/build/
+modules/*/ios/build/

@@ -1,0 +1,8 @@
+{
+  "name": "audio-session",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lets WKWebView audio play with the iOS silent switch on (Scrimba Companion local module)",
+  "main": "index.ts",
+  "license": "MIT"
+}

@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  Local test fixture that reproduces the *structure* of Scrimba's IDE that matters for the
+  compatibility runtime, using the real monaco-editor package. It contains no Scrimba code
+  or content. Mirrored behaviours (from docs/COMPATIBILITY_FINDINGS.md):
+   - html.touch-interface + `si-monaco-editor { pointer-events: none }` on touch devices
+   - scrim-play-controls with op-icon.play whose svg class is "pause" while playing
+   - ide-clip-captions with a clipped background layer as first child
+   - si-browser-view mini preview, ide-header RERUN button, mod+s save hotkey
+   - app-ide with a transform (containing block for position:fixed)
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Mock Scrimba IDE</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1e1e1e; color: #ddd; font-family: sans-serif; }
+      app-ide { display: flex; flex-direction: column; height: 100%; transform: translateZ(0); }
+      ide-header { display: flex; gap: 8px; align-items: center; height: 34px; padding: 0 8px; background: #252526; }
+      si-workspace-canvas { position: relative; flex: 1; container-type: size; }
+      si-file-view { position: absolute; inset: 0; display: block; background: lch(11.28 5.58 125); }
+      /* Scrimba's Monaco theme is transparent; the colour comes from si-file-view. */
+      .monaco-editor, .monaco-editor .monaco-editor-background, .monaco-editor .margin { background-color: rgba(255,255,255,0) !important; }
+      si-monaco-editor { display: block; position: absolute; inset: 0; }
+      .container { position: absolute; inset: 0; }
+      html.touch-interface si-monaco-editor { pointer-events: none; }
+      si-browser-view { position: absolute; right: 8px; top: 8px; width: 120px; height: 90px; background: #fff; color: #000; z-index: 5; display: block; }
+      ide-clip-captions { position: absolute; bottom: 70px; left: 10%; right: 10%; text-align: center; font-size: 18px; z-index: 6; pointer-events: none; display: block; }
+      ide-clip-captions > div:first-child { position: absolute; inset: 0; background: rgba(0,0,0,.3); }
+      scrim-play-controls { display: flex; height: 40px; align-items: center; padding: 0 8px; background: #333; }
+      op-icon.play { width: 32px; height: 32px; display: inline-block; cursor: pointer; }
+      op-icon.play svg { width: 32px; height: 32px; }
+      op-button { padding: 4px 8px; background: #2a7; color: #fff; display: inline-block; }
+    </style>
+  </head>
+  <body>
+    <app-ide>
+      <ide-header><span>Mock lesson</span><op-button id="rerun">RERUN</op-button></ide-header>
+      <si-workspace-canvas>
+        <si-file-view>
+          <si-monaco-editor><div class="container" id="editor"></div></si-monaco-editor>
+        </si-file-view>
+        <si-browser-view>preview</si-browser-view>
+        <ide-clip-captions><div></div><div class="body"><span>Hello there.</span></div></ide-clip-captions>
+      </si-workspace-canvas>
+      <scrim-play-controls>
+        <op-icon class="play" id="play"><svg class="yr_af play phosphor filled" viewBox="0 0 10 10"><rect width="10" height="10" fill="#4af" /></svg></op-icon>
+      </scrim-play-controls>
+    </app-ide>
+    <script>
+      window.fixture = { runClicks: 0, saveKeys: 0, playToggles: 0 };
+      if (navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches) document.documentElement.classList.add('touch-interface');
+      document.getElementById('rerun').addEventListener('click', () => window.fixture.runClicks++);
+      const play = document.getElementById('play');
+      window.fixture.setPlaying = (on) => play.querySelector('svg').setAttribute('class', 'yr_af ' + (on ? 'pause' : 'play') + ' phosphor filled');
+      play.addEventListener('click', () => {
+        window.fixture.playToggles++;
+        const playing = play.querySelector('svg').getAttribute('class').includes('pause');
+        window.fixture.setPlaying(!playing);
+      });
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); window.fixture.saveKeys++; }
+      }, true);
+    </script>
+    <link rel="stylesheet" href="/monaco/vs/editor/editor.main.css" />
+    <script src="/monaco/vs/loader.js"></script>
+    <script>
+      require.config({ paths: { vs: '/monaco/vs' } });
+      require(['vs/editor/editor.main'], function () {
+        window.fixture.editor = monaco.editor.create(document.getElementById('editor'), {
+          value: ['function greet(name) {', '  return "Hi " + name;', '}', '', 'greet("world");'].join('\n'),
+          language: 'javascript',
+          theme: 'vs-dark',
+          automaticLayout: true,
+          minimap: { enabled: false },
+          fontSize: 16,
+        });
+        window.fixture.ready = true;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit & component tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Injected bundle is up to date
+        run: npm run check:injected
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+
+  e2e:
+    name: E2E (real Monaco fixture, Chromium + WebKit, touch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/report
+            e2e/test-results
+          retention-days: 7
+
+  android-build:
+    name: Android release APK (smoke build)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Assemble release APK (debug-signed)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+        env:
+          NODE_ENV: production
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scrimba-companion-ci-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
+  ios-build:
+    # Compiles the whole iOS app (incl. the local Swift modules) without an Apple account.
+    # The .ipa is unsigned: install it only by re-signing it yourself (e.g. a sideloading
+    # tool with your own Apple ID); App Store/TestFlight builds go through EAS.
+    name: iOS release build (unsigned, smoke build)
+    runs-on: macos-26
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Select the newest Xcode 26 (Expo SDK 58 needs 26.4+)
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+        env:
+          NODE_ENV: production
+      - name: Build Release for iphoneos (no code signing)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ScrimbaCompanion.xcworkspace -scheme ScrimbaCompanion \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 200
+        env:
+          NODE_ENV: production
+      - name: Package unsigned .ipa
+        run: |
+          mkdir -p dist-ios/Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/ScrimbaCompanion.app dist-ios/Payload/
+          (cd dist-ios && zip -qry scrimba-companion-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scrimba-companion-ci-ipa-unsigned
+          path: dist-ios/scrimba-companion-unsigned.ipa
+          retention-days: 7

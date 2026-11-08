@@ -23,11 +23,12 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
-## Navigation & Routing
+## This project
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+- Single-screen app (`App.tsx` → `src/screens/BrowserScreen.tsx`) hosting one long-lived WebView; it does **not** use Expo Router.
+- Page-side code lives in `src/injected/` and is bundled with esbuild into `src/injected/generated/bundles.ts`. Run `npm run build:injected` after changing it (CI runs `npm run check:injected`).
+- Read `docs/COMPATIBILITY_FINDINGS.md` before changing compatibility modules; verify against the live site with `npm run test:live` and on a device with `npm run test:android`.
+- Never claim Scrimba compatibility from mocked tests alone.
 
 ## Building with EAS
 

@@ -1,0 +1,35 @@
+name: Live Scrimba compatibility check
+
+# Manually triggered: runs the injected runtime against the real scrimba.com (public
+# scrim, no login). Scrimba can change at any time; a failure is a signal to update the
+# compatibility modules, not necessarily a regression in this repo.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Public Scrimba scrim URL
+        default: https://scrimba.com/s0v687325e
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:live
+        env:
+          SCRIMBA_LIVE_URL: ${{ inputs.url }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-results
+          path: e2e/test-results-live
+          retention-days: 7
