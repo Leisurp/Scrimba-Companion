@@ -73,16 +73,11 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon
         env:
           NODE_ENV: production
-      - uses: actions/upload-artifact@v4
-        with:
-          name: scrimba-companion-ci-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 7
+      # Build check only: this APK uses Expo's public debug key, so it isn't uploaded.
+      # Installable builds come from the Release workflow (GitHub Releases).
 
   ios-build:
     # Compiles the whole iOS app (incl. the local Swift modules) without an Apple account.
-    # The .ipa is unsigned: install it only by re-signing it yourself (e.g. a sideloading
-    # tool with your own Apple ID); App Store/TestFlight builds go through EAS.
     name: iOS release build (unsigned, smoke build)
     runs-on: macos-26
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -111,13 +106,4 @@ jobs:
             build | tail -n 200
         env:
           NODE_ENV: production
-      - name: Package unsigned .ipa
-        run: |
-          mkdir -p dist-ios/Payload
-          cp -R ios/build/Build/Products/Release-iphoneos/ScrimbaCompanion.app dist-ios/Payload/
-          (cd dist-ios && zip -qry scrimba-companion-unsigned.ipa Payload)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: scrimba-companion-ci-ipa-unsigned
-          path: dist-ios/scrimba-companion-unsigned.ipa
-          retention-days: 7
+      # Build check only. The installable .ipa is attached to GitHub Releases by the Release workflow.

@@ -1,0 +1,36 @@
+name: Bug report
+description: Something doesn't work in the app
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Security problems: please don't post them here, see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and system version
+      placeholder: e.g. Pixel 8, Android 16
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings → About
+  - type: input
+    id: lesson
+    attributes:
+      label: Lesson link (if it happens in a particular lesson)
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (optional)
+      description: Settings → tap the version 7 times → Diagnostics → Export. It contains no cookies, code or personal links, but please look it over first.

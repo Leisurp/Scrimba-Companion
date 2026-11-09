@@ -51,7 +51,7 @@ Verified with real touch input:
 | Local fixture with real Monaco, Chromium + WebKit (Playwright touch) | tap does not focus | tap focuses; cursor placed at tap |
 | scrimba.com, mobile Chromium + mobile WebKit emulation (`npm run test:live`) | tap does not focus | tap focuses; typing, undo, auto-pause work |
 | **App on Android 16, System WebView 133, `adb input tap`** | n/a (fix on by default) | Monaco focused; **Gboard shown** (`mInputShown=true`) |
-| **App on a OnePlus 12 (Android 16, WebView 156), signed in, own copy of a scrim (`…/head`)** | taps hit `<main>`; diagnostics said "editor not blocked" | taps reach `.view-line`; Monaco focused; the user typed with the soft keyboard (`insertText` events) |
+| **App on a OnePlus 12 (Android 16, WebView 156), signed in, own copy of a scrim (`…/head`)** | taps hit `<main>`; diagnostics said "editor not blocked" | taps reach `.view-line`; Monaco focused; soft-keyboard typing reaches Monaco (`insertText` events) |
 
 **Signed-in layout (verified 2026-11-07 on the device over WebView DevTools).** When you are
 signed in and open your own copy of a scrim, the editor host is **`editor-widget`**, not
@@ -63,19 +63,23 @@ The host finder only matched tags ending in `-editor`, so it fell back to `div.$
 
 ### "Scrim unwritable due to syncing error" (Scrimba data, not the app)
 
-Scrimba shows this toast once, then drops every edit, when it cannot replay a scrim's saved edit
-stream (`IDE…Branch.syncBuffer` → an action's `decode` throws → `c.addToStream is not a function`;
-`write()` then refuses while `Symbol.for('#syncError')` is set). Seen on 2026-11-07 for one user's
-copy of a challenge (`IDESolutionBranch`, stream `/op/stream/<scrim>/stream`):
+Scrimba shows this toast once, then silently drops every edit, when it cannot replay a scrim's
+saved edit stream (`IDE…Branch.syncBuffer` → an action's `decode` throws →
+`c.addToStream is not a function`; `write()` then refuses while `Symbol.for('#syncError')` is set).
 
-* The phone's bytes were identical to the server's (6287 bytes), and a standard msgpack decoder reads
+One case was traced in detail (2026-11-07, a signed-in learner's copy of a challenge,
+`IDESolutionBranch`, stream `/op/stream/<scrim>/stream`):
+
+* The bytes in the WebView were identical to the server's, and a standard msgpack decoder reads
   them, so nothing was corrupted in transit or by the WebView.
-* Bytes 5446–6123 are a fragment of the preview's `index.html` (`…</style><script>SCRIMBA_REQUEST=…`)
-  written into the edit stream as raw bytes, so Scrimba's action decoder loses its place.
-* The session that wrote it (viewport 411×759) started on **6 Nov 2026 12:17 AEDT**, before this app
-  existed (first commit 15:46 that day). So a regular mobile browser wrote it, not the app.
-* Other scrims are unaffected. Recovery is on Scrimba's side (reset that challenge, or Scrimba support);
-  the app does not try to patch Scrimba's stream decoder, since writing to a broken stream could make it worse.
+* Part of the stream was a fragment of the lesson preview's `index.html`
+  (`…</style><script>SCRIMBA_REQUEST=…`) written in as raw bytes, so Scrimba's action decoder
+  loses its place.
+* That data was written from a regular mobile browser session before this app existed, so the
+  cause is on Scrimba's side.
+* Other scrims are unaffected. Recovery is on Scrimba's side (reset that challenge, or contact
+  Scrimba support). The app doesn't try to patch Scrimba's stream decoder, since writing to a
+  broken stream could make it worse.
 
 ### Touch text selection (selection module)
 
@@ -111,8 +115,8 @@ Implementation notes found while testing:
 Verified: unit tests; fixture e2e with real Monaco in Chromium and WebKit (double-tap, jittery
 double-tap, long press, both handles, Cut/Copy/Paste/Select all, setting off); live scrimba.com in
 mobile Chromium and WebKit; and on a OnePlus 12 (WebView 156) over WebView DevTools with synthetic
-touch: double-tap, jittery double-tap, long press, end and start handle drags across lines. The user
-then confirmed selection, handles and copy/paste by hand on the same phone (2026-11-07).
+touch: double-tap, jittery double-tap, long press, end and start handle drags across lines; then
+selection, handles and copy/paste by hand on the same phone (2026-11-07).
 
 ## 3. Input path and the bridge
 
@@ -234,10 +238,10 @@ so content, cursor, undo history and saving are unaffected.
   Custom Tab on a link that 302s to `scrimba.com/auth/github/callback?code=…&state=<pending state>`
   stands in for GitHub's final redirect: Chrome handed it to the app (`START … LAUNCH_SINGLE_TASK`),
   the Custom Tab closed, and the WebView requested the callback with its own cookies.
-  Not verified: a real GitHub sign-in (needs the user's account). With a fake `code` Scrimba
-  never answered the WebView's request (with the wrong `state` it answers 400 at once, so the
-  `state` check passed), which is why the app gives up after 20 s, returns to the page and asks the
-  user to try again.
+  A real sign-in (a GitHub account that uses "Continue with Google") was then confirmed on a
+  OnePlus 12 (Android 16). With a fake `code` Scrimba never answered the WebView's request (with the
+  wrong `state` it answers 400 at once, so the `state` check passed), which is why the app gives up
+  after 20 s, returns to the page and asks the user to try again.
 * The root view pads by `useSafeAreaInsets()` with `initialWindowMetrics`, not the native
   `SafeAreaView`, to avoid the toolbar briefly sitting under the status bar on cold start
   (reported intermittently on a OnePlus 12; not reproduced on the emulator).

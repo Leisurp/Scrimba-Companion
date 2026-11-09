@@ -63,6 +63,14 @@
   "private": true,
   "description": "Unofficial open-source mobile companion that makes Scrimba interactive screencasts usable on phones.",
   "license": "MIT",
+  "homepage": "https://github.com/Leisurp/Scrimba-Companion#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leisurp/Scrimba-Companion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Leisurp/Scrimba-Companion/issues"
+  },
   "jest": {
     "projects": [
       {

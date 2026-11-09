@@ -32,17 +32,17 @@ and the on-device script touch the real site.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Tap code → keyboard (Android) | **Verified** (emulator) | `mInputShown=true` after `adb input tap` on the code; Gboard visible in screenshot |
+| Tap code → keyboard (Android) | **Verified** (emulator + OnePlus 12) | `mInputShown=true` after `adb input tap` on the code; typing by hand on a OnePlus 12, signed in and signed out |
 | Tap code → focus (root cause fixed) | **Verified** (real WebView, live site in Chromium + WebKit) | Without fix: tap doesn't focus. With fix: focuses |
 | Tap code → keyboard (iOS) | **Unverified** | WebKit proxy passes; no iOS device |
 | Letters, punctuation, Enter/auto-indent, Backspace | **Verified** (emulator) | Model content read back after `adb input` |
 | IME composition | **Verified (proxy)** Chromium CDP composition; Gboard key input on emulator | Swipe typing / CJK on a device unverified |
-| Cursor movement, selection, copy/cut/paste, select all | **Verified (proxy)** real Monaco fixture; toolbar on emulator | System clipboard on device unverified |
+| Cursor movement, selection, copy/cut/paste, select all | **Verified** real Monaco fixture; toolbar on emulator; touch selection + system clipboard on a OnePlus 12 | |
 | Undo/redo through Monaco history | **Verified** (emulator toolbar + fixture) | Each toolbar insert is one undo step |
 | Changes reach Scrimba's editor | **Verified** | Scrimba marks the file dirty, creates its branch, shows "CTRL+S to save" |
 | Save (Ctrl/Cmd+S) | **Verified** (emulator) | Scrimba's unsaved dot cleared after toolbar/synthetic save |
 | Code execution in the app | **Blocked** (Android System WebView) | `crossOriginIsolated=false`, no `SharedArrayBuffer`; runner fails (`DataCloneError`); preview unchanged after edit + save + run. App shows notice + Open in browser |
-| Code execution anywhere | **Unverified** | Not confirmed even in the desktop pane used for investigation |
+| Code execution anywhere | **Unverified** | Not confirmed in any browser during investigation |
 | Native text-input bridge | **Verified (proxy)** real Monaco fixture (Chromium + WebKit) | Not run on a device |
 
 ### P1: playback, audio, subtitles

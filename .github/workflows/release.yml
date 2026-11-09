@@ -1,35 +1,68 @@
-name: Release builds
+name: Release
 
-# Manually triggered. Never publishes to Google Play or the App Store.
+# Builds the signed Android APK and the unsigned iPhone .ipa for a version tag and publishes
+# them as a GitHub Release. Asset names never change, so
+#   https://github.com/<owner>/<repo>/releases/latest/download/ScrimbaCompanion.apk
+# always points at the newest version.
+#
+# To release: set "version" in app.json (e.g. 1.2.0), commit, then push the tag v1.2.0.
+# Never publishes to Google Play or the App Store.
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      eas_android:
-        description: Also start an EAS Android "preview" APK build (needs EXPO_TOKEN secret)
-        type: boolean
-        default: false
-      eas_ios:
-        description: Also start an EAS iOS build (needs EXPO_TOKEN + Apple credentials in EAS)
-        type: boolean
-        default: false
-      draft_release:
-        description: Create a draft GitHub Release with the APK attached
-        type: boolean
-        default: true
+      tag:
+        description: Existing version tag to (re)build and publish, e.g. v1.0.0
+        required: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # Passed through env (never inlined into scripts) so a crafted input can't inject shell code.
+  TAG: ${{ inputs.tag || github.ref_name }}
+
 jobs:
-  android-apk:
-    name: Android APK (Gradle)
+  check:
+    name: Check tag and signing secrets
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # only for the draft GitHub Release
-    env:
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - id: v
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' is not a version tag like v1.2.3"; exit 1
+          fi
+          VERSION=$(node -p "require('./app.json').expo.version")
+          if [ "v$VERSION" != "$TAG" ]; then
+            echo "::error::Tag $TAG doesn't match app.json version $VERSION"; exit 1
+          fi
+          # A debug-signed APK uses Expo's public debug key: anyone could sign a fake update
+          # with it that installs over the app and its signed-in session. Never publish one.
+          if [ "$HAS_KEYSTORE" != "true" ]; then
+            echo "::error::Add the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets (see docs/RELEASING.md)."; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android APK (signed)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -41,9 +74,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
       - run: npm run verify
+      - name: Build numbers from the version
+        run: node scripts/set-build-numbers.mjs
       - run: npx expo prebuild --platform android --no-install
-      - name: Restore release keystore (optional)
-        if: env.HAS_KEYSTORE == 'true'
+        env:
+          NODE_ENV: production
+      - name: Restore release keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
@@ -51,63 +87,108 @@ jobs:
         working-directory: android
         env:
           NODE_ENV: production
-          # Gradle reads ORG_GRADLE_PROJECT_* as project properties, so the passwords never
-          # appear on a command line (process list, logs).
+          # Gradle reads ORG_GRADLE_PROJECT_* as project properties: no passwords on a command line.
           ORG_GRADLE_PROJECT_SC_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_SC_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_SC_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ "$HAS_KEYSTORE" = "true" ]; then
-            export ORG_GRADLE_PROJECT_SC_RELEASE_STORE_FILE="$RUNNER_TEMP/release.keystore"
-          else
-            echo "::warning::No release keystore secrets; APK is signed with a debug key (installable, but not upgradable by APKs signed differently)."
-          fi
+          export ORG_GRADLE_PROJECT_SC_RELEASE_STORE_FILE="$RUNNER_TEMP/release.keystore"
           ./gradlew assembleRelease --no-daemon
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/release.keystore"
-      - name: Name artifact
+      - name: Check the APK is release-signed
         run: |
-          VERSION=$(node -p "require('./app.json').expo.version")
-          cp android/app/build/outputs/apk/release/app-release.apk "scrimba-companion-${VERSION}.apk"
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | tee signer.txt
+          if grep -q "CN=Android Debug" signer.txt; then echo "::error::APK is debug-signed"; exit 1; fi
+          cp android/app/build/outputs/apk/release/app-release.apk ScrimbaCompanion.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: scrimba-companion-apk
-          path: scrimba-companion-*.apk
-      # A debug-signed APK uses the Expo template's public debug key: anyone could sign a
-      # different APK with it and install it over the app (and its signed-in session).
-      # Never publish one.
-      - name: Refuse to publish a debug-signed APK
-        if: ${{ inputs.draft_release && env.HAS_KEYSTORE != 'true' }}
-        run: |
-          echo "::error::Draft release skipped: set ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets to publish APKs."
-          exit 1
-      - name: Draft GitHub Release
-        if: ${{ inputs.draft_release && env.HAS_KEYSTORE == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "v${VERSION}-${GITHUB_RUN_NUMBER}" scrimba-companion-*.apk \
-            --draft --title "Scrimba Companion ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
-            --notes "Unofficial, not affiliated with Scrimba. See README for install steps and known limitations."
+          name: android
+          path: ScrimbaCompanion.apk
+          retention-days: 7
 
-  eas:
-    name: EAS cloud builds (optional)
-    runs-on: ubuntu-latest
-    if: ${{ inputs.eas_android || inputs.eas_ios }}
+  ios:
+    # Unsigned: iPhones only install it after re-signing with your own Apple ID in a
+    # sideloading app (AltStore, SideStore, Sideloadly). App Store/TestFlight builds go through EAS.
+    name: iPhone .ipa (unsigned)
+    needs: check
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Select the newest Xcode 26 (Expo SDK 58 needs 26.4+)
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
       - run: npm ci
-      - if: ${{ inputs.eas_android }}
-        run: eas build --platform android --profile preview --non-interactive --no-wait
-      - if: ${{ inputs.eas_ios }}
-        run: eas build --platform ios --profile preview --non-interactive --no-wait
+      - name: Build numbers from the version
+        run: node scripts/set-build-numbers.mjs
+      - run: npx expo prebuild --platform ios
+        env:
+          NODE_ENV: production
+      - name: Build Release for iphoneos (no code signing)
+        working-directory: ios
+        env:
+          NODE_ENV: production
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ScrimbaCompanion.xcworkspace -scheme ScrimbaCompanion \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 200
+      - name: Package .ipa
+        run: |
+          mkdir -p dist-ios/Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/ScrimbaCompanion.app dist-ios/Payload/
+          (cd dist-ios && zip -qry ../ScrimbaCompanion-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: ScrimbaCompanion-unsigned.ipa
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: [check, android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Checksums
+        run: sha256sum ScrimbaCompanion.apk ScrimbaCompanion-unsigned.ipa > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > notes.md <<EOF
+          **Android:** download **ScrimbaCompanion.apk** below, open it and tap Install (Android 7.0 or newer).
+          Already installed? Installing this one updates it and keeps you signed in.
+
+          **iPhone (experimental):** download **ScrimbaCompanion-unsigned.ipa** and install it with
+          AltStore, SideStore or Sideloadly using your Apple ID. Not yet tested on a real iPhone.
+
+          See the [README](https://github.com/${REPO}#readme) for step-by-step help.
+          Unofficial app, not affiliated with Scrimba.
+
+          [All changes since the previous release](https://github.com/${REPO}/commits/${TAG})
+          EOF
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh release create "$TAG" ScrimbaCompanion.apk ScrimbaCompanion-unsigned.ipa SHA256SUMS.txt \
+            --verify-tag --latest --title "Scrimba Companion $VERSION" --notes-file notes.md
