@@ -4,8 +4,10 @@
  */
 import {
   PAGE_BOOT_CONFIG,
+  PAGE_EARLY_OPTIONS,
   PAGE_GLOBAL,
   PAGE_TOKEN,
+  type EarlyOptions,
   type NativeToPage,
   type PageToNative,
   type RuntimeConfig,
@@ -50,8 +52,8 @@ export function jsLiteral(value: unknown): string {
 const SCRIMBA_HOST_RE = /^(www\.)?scrimba\.com$/;
 export const SCRIMBA_PAGE_CHECK = `(location.protocol==='https:'&&${SCRIMBA_HOST_RE.toString()}.test(location.hostname))`;
 
-export function buildEarlyScript(): string {
-  return `if(${SCRIMBA_PAGE_CHECK}){\n${EARLY_SCRIPT}\n}\ntrue;`;
+export function buildEarlyScript(options: EarlyOptions = {}): string {
+  return `if(${SCRIMBA_PAGE_CHECK}){try{window.${PAGE_EARLY_OPTIONS}=${jsLiteral(options)};}catch(e){}\n${EARLY_SCRIPT}\n}\ntrue;`;
 }
 
 export function buildMainScript(config: RuntimeConfig, token: string): string {

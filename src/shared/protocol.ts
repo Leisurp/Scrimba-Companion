@@ -188,6 +188,13 @@ export type PageMessageKind = PageToNative['kind'];
 /** Global names used inside the page. */
 export const PAGE_GLOBAL = '__SC__';
 export const PAGE_EARLY_GLOBAL = '__SC_EARLY__';
+/** Options for the early script, set just before it runs. */
+export const PAGE_EARLY_OPTIONS = '__SC_EARLY_OPTS__';
+
+export interface EarlyOptions {
+  /** iOS: no second window exists, so empty popups get a stand-in (see injected/popups.ts). */
+  singleWindowPopups?: boolean;
+}
 export const PAGE_BOOT_CONFIG = '__SC_BOOT_CONFIG__';
 export const PAGE_TOKEN = '__SC_TOKEN__';
 

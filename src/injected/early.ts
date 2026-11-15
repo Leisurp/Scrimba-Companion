@@ -6,13 +6,23 @@
  *  - emits `sc:locationchange` on History API navigation;
  *  - records uncaught error *messages* (no stacks, no URLs) for diagnostics.
  */
-import { PAGE_EARLY_GLOBAL } from '../shared/protocol';
+import { PAGE_EARLY_GLOBAL, PAGE_EARLY_OPTIONS, type EarlyOptions } from '../shared/protocol';
+import { installSingleWindowPopups } from './popups';
 
 export function installEarlyHooks(win: Window): void {
   const w = win as unknown as Record<string, unknown>;
   if (w[PAGE_EARLY_GLOBAL]) return;
   const state = { media: [] as WeakRef<HTMLMediaElement>[], mediaErrors: [] as string[], errors: [] as string[] };
   w[PAGE_EARLY_GLOBAL] = state;
+
+  const opts = (w[PAGE_EARLY_OPTIONS] || {}) as EarlyOptions;
+  if (opts.singleWindowPopups) {
+    try {
+      installSingleWindowPopups(win);
+    } catch {
+      /* ignore */
+    }
+  }
 
   const push = (arr: string[], msg: string) => {
     arr.push(msg.slice(0, 200));

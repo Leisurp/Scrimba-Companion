@@ -38,6 +38,7 @@ import {
   isScrimbaUrl,
   looksLikeLesson,
   sanitizeResumeUrl,
+  isScrimbaGitHubStart,
   scrimbaGitHubAuthorize,
 } from '../webview/urlPolicy';
 import { clearPendingSignIn, hasBrowserSignInWorked, startPendingSignIn, takeCallback } from '../state/browserSignIn';
@@ -50,7 +51,7 @@ import { fnv1a } from '../shared/hash';
 import type { EditorCommand, EditorState, LineState, PageToNative, PlaybackState } from '../shared/protocol';
 import { SCRIMBA_HOME } from '../config/constants';
 
-const EARLY_SCRIPT = buildEarlyScript();
+const EARLY_SCRIPT = buildEarlyScript({ singleWindowPopups: Platform.OS === 'ios' });
 
 interface LoadError {
   title: string;
@@ -313,6 +314,11 @@ export function BrowserScreen({ initialUrl }: BrowserScreenProps) {
   );
 
   const onShouldStartLoadWithRequest = useCallback((req: ShouldStartLoadRequest) => {
+    // iOS: GitHub sign-in runs in this WebView (Scrimba's popup is replaced by a page-side
+    // stand-in). Remember the page to return to once Scrimba's callback page has loaded.
+    if (Platform.OS === 'ios' && req.isTopFrame !== false && (isScrimbaGitHubStart(req.url) || scrimbaGitHubAuthorize(req.url))) {
+      signInReturnRef.current = sanitizeResumeUrl(currentLocation.current) ?? signInReturnRef.current ?? SCRIMBA_HOME;
+    }
     if (Platform.OS === 'android' && req.isTopFrame !== false) {
       const auth = scrimbaGitHubAuthorize(req.url);
       if (auth) {

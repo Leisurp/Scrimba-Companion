@@ -68,6 +68,12 @@ export function isScrimbaGitHubCallback(url: string): boolean {
   return !!u && u.protocol === 'https:' && u.hostname === 'scrimba.com' && u.pathname === '/auth/github/callback';
 }
 
+/** Scrimba's start of GitHub sign-in (it redirects to GitHub's authorize step). */
+export function isScrimbaGitHubStart(url: string): boolean {
+  const u = parseUrl(url);
+  return !!u && u.protocol === 'https:' && (u.hostname === 'scrimba.com' || u.hostname === 'www.scrimba.com') && /^\/auth\/github\/?$/.test(u.pathname);
+}
+
 /**
  * If `url` is GitHub's OAuth authorize step for Scrimba (directly, or GitHub's sign-in page
  * whose `return_to` leads there), returns the authorize URL and its `state`; otherwise null.

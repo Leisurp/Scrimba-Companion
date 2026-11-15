@@ -107,3 +107,17 @@ jobs:
         env:
           NODE_ENV: production
       # Build check only. The installable .ipa is attached to GitHub Releases by the Release workflow.
+      # Exception: "Run workflow" (manual) attaches a short-lived test .ipa for checking a fix on a
+      # phone before it is released. Downloading it needs a GitHub sign-in.
+      - name: Package unsigned test .ipa (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p dist-ios/Payload
+          cp -R ios/build/Build/Products/Release-iphoneos/ScrimbaCompanion.app dist-ios/Payload/
+          (cd dist-ios && zip -qry ScrimbaCompanion-test-unsigned.ipa Payload)
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: ScrimbaCompanion-test-unsigned-ipa
+          path: dist-ios/ScrimbaCompanion-test-unsigned.ipa
+          retention-days: 7

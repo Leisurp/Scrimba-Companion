@@ -242,6 +242,18 @@ so content, cursor, undo history and saving are unaffected.
   OnePlus 12 (Android 16). With a fake `code` Scrimba never answered the WebView's request (with the
   wrong `state` it answers 400 at once, so the `state` check passed), which is why the app gives up
   after 20 s, returns to the page and asks the user to try again.
+* **GitHub sign-in on iOS.** Reported 2026-11-15 on an iPhone 17 Pro Max: "Continue with GitHub"
+  left a blank page. Traced on the live site (WebKit): Scrimba calls
+  `window.open('about:blank', '_blank', 'popup,…')`, adds `message`/`load` listeners, reads
+  `closed`, then sets `popup.location = '/auth/github'`. react-native-webview on iOS has no second
+  window: it loads `about:blank` into the main WebView and returns `null`, so the location is never
+  set. The early script (iOS only, `singleWindowPopups`) now returns a stand-in for empty popups
+  whose `location` navigates the main window, which is what Android's WebView does with multiple
+  windows off. Checked against the live site with that iOS behaviour mimicked in Playwright WebKit:
+  without the stand-in the page ends on `about:blank`, with it on GitHub's sign-in form. The app
+  returns to the original page after Scrimba's callback, as on Android. iOS cannot hand sign-in to
+  Safari and back (it can't claim scrimba.com links), so GitHub's "Continue with Google" stays
+  blocked by Google there; a GitHub password (+ 2FA) works. Not yet confirmed on the phone.
 * The root view pads by `useSafeAreaInsets()` with `initialWindowMetrics`, not the native
   `SafeAreaView`, to avoid the toolbar briefly sitting under the status bar on cold start
   (reported intermittently on a OnePlus 12; not reproduced on the emulator).

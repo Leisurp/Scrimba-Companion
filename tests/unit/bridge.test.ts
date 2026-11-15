@@ -57,6 +57,8 @@ describe('message validation', () => {
     expect(runsOn('http://scrimba.com/')).toBe(false);
     expect(buildMainScript(DEFAULT_RUNTIME_CONFIG, 'tok').startsWith(`if(${SCRIMBA_PAGE_CHECK})`)).toBe(true);
     expect(buildEarlyScript().startsWith(`if(${SCRIMBA_PAGE_CHECK})`)).toBe(true);
+    expect(buildEarlyScript({ singleWindowPopups: true })).toContain('__SC_EARLY_OPTS__={"singleWindowPopups":true}');
+    expect(buildEarlyScript()).toContain('__SC_EARLY_OPTS__={}');
     // Commands may carry clipboard text (paste): never delivered to other pages.
     expect(buildCommandScript({ kind: 'editor', id: 1, command: { type: 'paste', text: 'x' } }).startsWith(`if(${SCRIMBA_PAGE_CHECK})`)).toBe(true);
   });
