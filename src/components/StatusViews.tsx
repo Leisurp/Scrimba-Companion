@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Palette } from '../theme/theme';
 
 export function OfflineBanner({ palette, onRetry }: { palette: Palette; onRetry(): void }) {
@@ -46,7 +46,9 @@ export function GitHubSignInHint({ palette, onSetPassword, onDismiss }: { palett
   return (
     <View testID="github-signin-hint" accessibilityRole="alert" style={[styles.notice, { backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}>
       <Text style={[styles.noticeText, { color: palette.text }]} numberOfLines={3}>
-        GitHub hides “Continue with Google” in apps. Use Google for GitHub? Set a GitHub password in your browser, then sign in here.
+        {Platform.OS === 'ios'
+          ? 'Google blocks “Continue with Google” inside iPhone apps. Use Google for GitHub? Set a GitHub password in Safari once, then sign in here.'
+          : 'GitHub hides “Continue with Google” in apps. Use Google for GitHub? Set a GitHub password in your browser, then sign in here.'}
       </Text>
       <Pressable testID="github-set-password" accessibilityRole="button" onPress={onSetPassword} style={styles.noticeBtn}>
         <Text style={{ color: palette.accent, fontWeight: '700' }}>Set password</Text>

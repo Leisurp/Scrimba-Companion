@@ -177,7 +177,9 @@ jobs:
           Already installed? Installing this one updates it and keeps you signed in.
 
           **iPhone (experimental):** download **ScrimbaCompanion-unsigned.ipa** and install it with
-          AltStore, SideStore or Sideloadly using your Apple ID. Not yet tested on a real iPhone.
+          AltStore, SideStore or Sideloadly using your Apple ID. Lightly tested on a real iPhone.
+          On iPhone, Google sign-in is blocked inside apps: if your GitHub account uses Google, set a
+          GitHub password once in Safari and sign in to GitHub with it.
 
           See the [README](https://github.com/${REPO}#readme) for step-by-step help.
           Unofficial app, not affiliated with Scrimba.

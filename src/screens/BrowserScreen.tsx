@@ -335,6 +335,20 @@ export function BrowserScreen({ initialUrl }: BrowserScreenProps) {
     }
     const decision = classifyNavigation(req.url, req.isTopFrame !== false);
     if (decision === 'allow' && req.isTopFrame !== false && isGoogleOAuth(req.url)) {
+      if (Platform.OS === 'ios') {
+        // iOS can't hand sign-in to Safari and back (scrimba.com doesn't list this app), so Google
+        // always refuses here. Don't load its error page; offer the one-time GitHub password.
+        diagnostics.log('info', 'auth', 'Google sign-in refused on iOS; offered GitHub password');
+        Alert.alert(
+          'Google sign-in isn’t possible here',
+          'Google blocks its sign-in inside iPhone apps.\n\nIf your GitHub account uses Google: set a GitHub password once in Safari (GitHub emails you a link), then come back and sign in to GitHub with your email and that password. It’s the same GitHub account.',
+          [
+            { text: 'Set GitHub password', onPress: () => Linking.openURL(GITHUB_SET_PASSWORD_URL).catch(() => undefined) },
+            { text: 'OK', style: 'cancel' },
+          ],
+        );
+        return false;
+      }
       Alert.alert(
         'Google sign-in',
         'Google blocks its sign-in page inside embedded app browsers, so it will probably fail here. Sign in to Scrimba with email/password or GitHub instead. If your GitHub account uses Google, set a GitHub password in your browser first.',

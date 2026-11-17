@@ -8,6 +8,14 @@ interactive screencasts usable on phones, above all their code editor.**
 > lessons, bypass sign-in, or use private APIs. Scrimba's name and content belong to their owners;
 > this repository contains no Scrimba logos or artwork.
 
+<p align="center">
+  <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest/download/ScrimbaCompanion.apk"><b>⬇ Download for Android (.apk)</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest/download/ScrimbaCompanion-unsigned.ipa"><b>⬇ Download for iPhone (.ipa, sideload)</b></a>
+  <br>
+  <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest">All releases and install notes</a> · <a href="#download">How to install</a>
+</p>
+
 ## Why?
 
 Scrimba lessons play fine in a phone browser, but you can't edit the code: tapping it never brings
@@ -44,7 +52,7 @@ Want automatic updates? Add this repository's URL to [Obtainium](https://obtaini
 
 ### iPhone (experimental)
 
-The iPhone version builds, but hasn't been tested on a real iPhone yet. Apple doesn't allow
+The iPhone version has had only light testing on a real iPhone so far. Apple doesn't allow
 installing apps from outside the App Store directly, so you install it with a sideloading app and
 your own Apple ID:
 
@@ -64,7 +72,10 @@ for you).
   button. Editing, saving, playback and subtitles all work in the app.
 - **Signing in:** use your Scrimba email and password, or **Continue with GitHub**. Scrimba's
   **Continue with Google** doesn't work in any app (Google blocks it). On Android, GitHub sign-in
-  opens in your browser, so a GitHub account that uses Google works too.
+  opens in your browser, so a GitHub account that uses Google works too. **On iPhone**, GitHub
+  sign-in happens inside the app and Google blocks its sign-in there; if your GitHub account uses
+  Google, [set a GitHub password](https://github.com/password_reset) once in Safari, then sign in
+  to GitHub in the app with your email and that password (same GitHub account).
 - Scrimba can change their site at any time. If something stops working, please
   [open an issue](https://github.com/Leisurp/Scrimba-Companion/issues).
 
@@ -73,6 +84,8 @@ for you).
 - **"Continue with GitHub" doesn't bring me back to the app (Android):** the first time, the app
   asks you to allow it to open scrimba.com links. You can do this any time in Android Settings →
   Apps → Scrimba Companion → Open by default → Add link → tick **scrimba.com**.
+- **"Continue with Google" on GitHub fails (iPhone):** Google doesn't allow it inside apps on
+  iPhone. Set a GitHub password once (see *Signing in* above) and use that instead.
 - **The keyboard doesn't open:** tap directly on a line of code. If it still doesn't open, update
   **Android System WebView** from the Play Store.
 - **"App not installed" when updating:** you probably had an early test build. Uninstall it, then
