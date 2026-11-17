@@ -1,7 +1,8 @@
 name: Release
 
 # Builds the signed Android APK and the unsigned iPhone .ipa for a version tag and publishes
-# them as a GitHub Release. Asset names never change, so
+# them as a GitHub Release. Without the Android signing secrets the release has the iPhone .ipa
+# only: a debug-signed APK is never published. Asset names never change, so
 #   https://github.com/<owner>/<repo>/releases/latest/download/ScrimbaCompanion.apk
 # always points at the newest version.
 #
@@ -33,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      android: ${{ steps.v.outputs.android }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,14 +52,19 @@ jobs:
           fi
           # A debug-signed APK uses Expo's public debug key: anyone could sign a fake update
           # with it that installs over the app and its signed-in session. Never publish one.
-          if [ "$HAS_KEYSTORE" != "true" ]; then
-            echo "::error::Add the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets (see docs/RELEASING.md)."; exit 1
+          # Without the release key, skip Android rather than fall back to a debug-signed APK.
+          if [ "$HAS_KEYSTORE" = "true" ]; then
+            echo "android=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No Android signing secrets (see docs/RELEASING.md): this release has the iPhone .ipa only."
+            echo "android=false" >> "$GITHUB_OUTPUT"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   android:
     name: Android APK (signed)
     needs: check
+    if: needs.check.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,6 +136,7 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
       - run: npm ci
+      - run: npm run verify
       - name: Build numbers from the version
         run: node scripts/set-build-numbers.mjs
       - run: npx expo prebuild --platform ios
@@ -158,6 +166,8 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [check, android, ios]
+    # Runs when Android was skipped for lack of signing secrets, never when a build failed.
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.ios.result == 'success' && (needs.android.result == 'success' || needs.android.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release
@@ -166,15 +176,19 @@ jobs:
         with:
           merge-multiple: true
       - name: Checksums
-        run: sha256sum ScrimbaCompanion.apk ScrimbaCompanion-unsigned.ipa > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: sha256sum $(ls ScrimbaCompanion.apk ScrimbaCompanion-unsigned.ipa 2>/dev/null) > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Release notes
         env:
           VERSION: ${{ needs.check.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
+          if [ -f ScrimbaCompanion.apk ]; then
+            ANDROID_NOTE="**Android:** download **ScrimbaCompanion.apk** below, open it and tap Install (Android 7.0 or newer). Already installed? Installing this one updates it and keeps you signed in."
+          else
+            ANDROID_NOTE="**Android:** not in this release yet; it will come in a later one."
+          fi
           cat > notes.md <<EOF
-          **Android:** download **ScrimbaCompanion.apk** below, open it and tap Install (Android 7.0 or newer).
-          Already installed? Installing this one updates it and keeps you signed in.
+          ${ANDROID_NOTE}
 
           **iPhone (experimental):** download **ScrimbaCompanion-unsigned.ipa** and install it with
           AltStore, SideStore or Sideloadly using your Apple ID. Lightly tested on a real iPhone.
@@ -192,5 +206,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.check.outputs.version }}
         run: |
-          gh release create "$TAG" ScrimbaCompanion.apk ScrimbaCompanion-unsigned.ipa SHA256SUMS.txt \
+          gh release create "$TAG" $(ls ScrimbaCompanion.apk 2>/dev/null) ScrimbaCompanion-unsigned.ipa SHA256SUMS.txt \
             --verify-tag --latest --title "Scrimba Companion $VERSION" --notes-file notes.md

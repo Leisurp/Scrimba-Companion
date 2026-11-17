@@ -9,9 +9,9 @@ interactive screencasts usable on phones, above all their code editor.**
 > this repository contains no Scrimba logos or artwork.
 
 <p align="center">
-  <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest/download/ScrimbaCompanion.apk"><b>⬇ Download for Android (.apk)</b></a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest/download/ScrimbaCompanion-unsigned.ipa"><b>⬇ Download for iPhone (.ipa, sideload)</b></a>
+  &nbsp;·&nbsp;
+  <b>Android: coming soon</b>
   <br>
   <a href="https://github.com/Leisurp/Scrimba-Companion/releases/latest">All releases and install notes</a> · <a href="#download">How to install</a>
 </p>
@@ -41,6 +41,8 @@ code along on your phone.
 Get the latest version from the [**Releases page**](https://github.com/Leisurp/Scrimba-Companion/releases/latest).
 
 ### Android
+
+**Coming soon:** the Android download will be added in a later release.
 
 1. On your phone, download
    [**ScrimbaCompanion.apk**](https://github.com/Leisurp/Scrimba-Companion/releases/latest/download/ScrimbaCompanion.apk).

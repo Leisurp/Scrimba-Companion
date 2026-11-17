@@ -11,7 +11,7 @@ links in the README always work:
 
 ## One-time setup
 
-The release workflow refuses to publish unless the Android release key is configured. Add these
+Without the Android release key the workflow publishes the iPhone .ipa only (never a debug-signed APK). To include Android, add these
 repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
